@@ -1,0 +1,105 @@
+# ============================================
+# AgentCart — Complete 6-Service Docker Stack
+# ============================================
+# Run with: docker compose up -d
+# No paid API keys required.
+
+services:
+  # 1. Database: PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: agentcart-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentcart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentcart_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-agentcart}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentcart -d agentcart"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 2. Local LLM Server: Ollama
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentcart-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # 3. Speech-to-Text: faster-whisper REST service
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: agentcart-whisper
+    environment:
+      - ASR_MODEL=${WHISPER_MODEL:-base}
+      - ASR_ENGINE=faster_whisper
+    ports:
+      - "9000:9000"
+    volumes:
+      - whisper_cache:/root/.cache/whisper
+    restart: unless-stopped
+
+  # 4. Text-to-Speech: Kokoro TTS
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: agentcart-kokoro
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
+
+  # 5. Backend: FastAPI + LangGraph Agent
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: agentcart-backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-agentcart}:${POSTGRES_PASSWORD:-agentcart_secret}@postgres:5432/${POSTGRES_DB:-agentcart}
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      - WHISPER_URL=http://whisper:9000
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - KOKORO_URL=http://kokoro:8880
+      - KOKORO_VOICE=${KOKORO_VOICE:-af_heart}
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:80,http://localhost
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      whisper:
+        condition: service_started
+      kokoro:
+        condition: service_started
+    restart: unless-stopped
+
+  # 6. Frontend: React + Vite + Nginx
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: agentcart-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  whisper_cache:
+    driver: local

@@ -1,0 +1,59 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+**/venv/
+.venv/
+**/.venv/
+env/
+**/env/
+
+# Node & Frontend
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+frontend/dist/
+frontend/build/
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS & Temp
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Docker & Data
+docker/volumes/
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing & Coverage
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+**/logs/
+
