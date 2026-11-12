@@ -1,10 +1,22 @@
-"""Document model for RAG — stores policy documents with pgvector embeddings."""
+"""Document model for RAG — stores policy documents with embeddings or text fallback."""
 
+import os
 import datetime
-from sqlalchemy import String, Text, DateTime, func
+from sqlalchemy import String, Text, DateTime, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from pgvector.sqlalchemy import Vector
 from app.database.base import Base
+
+# Allow disabling pgvector for local PostgreSQL instances without pgvector compiled
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "false").lower() in ("true", "1")
+
+if USE_PGVECTOR:
+    try:
+        from pgvector.sqlalchemy import Vector
+        EmbeddingType = Vector(768)
+    except Exception:
+        EmbeddingType = JSON
+else:
+    EmbeddingType = JSON
 
 
 class Document(Base):
@@ -14,7 +26,7 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    embedding = mapped_column(Vector(768), nullable=True)  # nomic-embed-text: 768 dims
+    embedding = mapped_column(EmbeddingType, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

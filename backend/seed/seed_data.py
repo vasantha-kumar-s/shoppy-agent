@@ -38,10 +38,9 @@ async def seed_database():
     """Main seeder: creates tables and populates all data."""
 
     # Create tables
-    async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("✅ Tables created")
+    from app.database.init_db import init_db
+    await init_db()
+    logger.info('Tables ready')
 
     async with async_session_factory() as session:
         # Check if already seeded

@@ -117,6 +117,7 @@ class OrderService:
 
         return {
             "success": True,
+            "id": order.id,
             "order_id": order.id,
             "order_number": order.order_number,
             "status": order.status,
@@ -186,6 +187,7 @@ class OrderService:
             address_str = f"{a.street}, {a.city}, {a.state} - {a.pincode}"
 
         return {
+            "id": order.id,
             "order_id": order.id,
             "order_number": order.order_number,
             "status": order.status,

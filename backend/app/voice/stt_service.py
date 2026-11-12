@@ -28,7 +28,7 @@ class STTService:
         files_primary = {"audio_file": (filename, audio_bytes, "audio/webm")}
 
         try:
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.post(asr_url, params=params, files=files_primary)
                 if resp.status_code == 200:
                     try:
@@ -48,7 +48,7 @@ class STTService:
         data_fallback = {"model": settings.WHISPER_MODEL, "language": "en"}
 
         try:
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.post(v1_url, files=files_fallback, data=data_fallback)
                 if resp.status_code == 200:
                     json_data = resp.json()

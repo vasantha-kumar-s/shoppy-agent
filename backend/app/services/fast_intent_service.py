@@ -42,24 +42,32 @@ class FastIntentService:
         self, text: str, user_id: int = 1, conversation_id: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Attempt to resolve user shopping request instantly. Returns response dict if handled, else None."""
-        raw_clean = text.lower().strip()
-        # Remove trailing punctuation and leading interjections ("so,", "well,", etc.)
-        clean = re.sub(r'^[,\s]*(so|well|hey|hi|hello|ok|okay)[,\s]*', '', raw_clean).strip()
-        clean = re.sub(r'[?.!,;:]+$', '', clean).strip()
+        raw_clean = re.sub(r'[?.!,;:]+$', '', text.lower().strip()).strip()
 
         # -------------------------------------------------------------
-        # 1. Polite Greetings & Common Reactions (e.g., "my god", "thanks", "hello", "great")
+        # 1. Polite Greetings & Common Reactions
         # -------------------------------------------------------------
-        if clean in ["my god", "omg", "wow", "nice", "cool", "super", "great", "awesome", "perfect"]:
+        if raw_clean in ["hello", "hi", "hey", "good morning", "good evening", "howdy", "greetings", "hello there", "hi there"]:
             return {
-                "response": "I'm glad to assist you! 😊 How can I help next? You can check out your cart, search for products, or track an order.",
+                "response": "Hello! I'm your AgentCart shopping assistant. How can I help you today? You can search for products (e.g. 'find laptops under ₹70,000'), check stock, or manage your cart.",
                 "products": [],
                 "tool_activities": [],
             }
 
-        if clean in ["hello", "hi", "hey", "good morning", "good evening", "howdy"]:
+        if raw_clean in ["who are you", "what can you do", "help", "help me", "what is this", "what do you do"]:
             return {
-                "response": "Hello! I'm your AgentCart shopping assistant. How can I help you today? You can search for products, check stock, or manage your cart.",
+                "response": "I'm your AgentCart AI shopping assistant! I can help you discover products, compare features side-by-side, check real-time stock, manage your cart, and place simulated orders. Try asking: 'Find wireless headphones under 5k' or 'What is the return policy?'",
+                "products": [],
+                "tool_activities": [],
+            }
+
+        # Remove leading conversational prefixes only if followed by additional words
+        clean = re.sub(r'^[,\s]*(so|well|hey|hi|hello|ok|okay)[,\s]+', '', raw_clean).strip()
+        clean = re.sub(r'[?.!,;:]+$', '', clean).strip()
+
+        if clean in ["my god", "omg", "wow", "nice", "cool", "super", "great", "awesome", "perfect"]:
+            return {
+                "response": "I'm glad to assist you! 😊 How can I help next? You can check out your cart, search for products, or track an order.",
                 "products": [],
                 "tool_activities": [],
             }

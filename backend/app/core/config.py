@@ -5,8 +5,11 @@ All settings loaded from environment variables with sensible defaults.
 No paid API keys required.
 """
 
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -14,7 +17,7 @@ class Settings(BaseSettings):
 
     # --- Database ---
     DATABASE_URL: str = (
-        "postgresql+asyncpg://agentcart:agentcart_secret@localhost:5433/agentcart"
+        "postgresql+asyncpg://postgres:root@127.0.0.1:5432/agentcart"
     )
 
     # --- Ollama (LLM) ---
@@ -35,7 +38,11 @@ class Settings(BaseSettings):
     # --- Backend ---
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    CORS_ORIGINS: str = (
+        "http://localhost:8080,http://127.0.0.1:8080,"
+        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,"
+        "http://localhost:80,http://localhost,*"
+    )
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -43,7 +50,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     class Config:
-        env_file = ".env"
+        env_file = [".env", str(BASE_DIR / ".env"), str(BASE_DIR.parent / ".env")]
         env_file_encoding = "utf-8"
         extra = "ignore"
 

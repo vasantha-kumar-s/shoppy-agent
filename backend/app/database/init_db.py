@@ -1,7 +1,7 @@
 """
 AgentCart — Database Initialization.
 
-Creates all tables and enables pgvector extension.
+Creates all tables and enables pgvector extension when available.
 """
 
 import logging
@@ -17,14 +17,24 @@ logger = logging.getLogger(__name__)
 
 async def init_db() -> None:
     """Create all tables and enable extensions."""
-    async with engine.begin() as conn:
-        # Enable pgvector extension
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        logger.info("pgvector extension enabled")
+    # 1. Try enabling pgvector in isolated transaction
+    try:
+        async with engine.begin() as conn:
+            avail = await conn.execute(
+                text("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
+            )
+            if avail.scalar():
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                logger.info("✅ pgvector extension enabled")
+            else:
+                logger.info("ℹ️ pgvector extension not present in PostgreSQL; running with text/keyword RAG fallback.")
+    except Exception as e:
+        logger.warning(f"Could not initialize pgvector extension: {e}. Falling back to keyword search.")
 
-        # Create all tables
+    # 2. Create all application tables
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("All database tables created")
+        logger.info("✅ All database tables created")
 
 
 async def drop_db() -> None:
