@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.database.init_db import init_db
-from app.api import health, products, cart, orders, chat, voice
+from app.api import health, products, cart, orders, chat, voice, admin
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +54,7 @@ app.include_router(cart.router)
 app.include_router(orders.router)
 app.include_router(chat.router)
 app.include_router(voice.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

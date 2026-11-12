@@ -42,14 +42,29 @@ class FastIntentService:
         self, text: str, user_id: int = 1, conversation_id: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Attempt to resolve user shopping request instantly. Returns response dict if handled, else None."""
-        raw_clean = text.lower().strip()
-        # Remove trailing punctuation and leading interjections ("so,", "well,", etc.)
-        clean = re.sub(r'^[,\s]*(so|well|hey|hi|hello|ok|okay)[,\s]*', '', raw_clean).strip()
-        clean = re.sub(r'[?.!,;:]+$', '', clean).strip()
+        raw_clean = re.sub(r'[?.!,;:]+$', '', text.lower().strip()).strip()
 
         # -------------------------------------------------------------
-        # 1. Polite Greetings & Common Reactions (e.g., "my god", "thanks", "hello", "great")
+        # 1. Polite Greetings & Common Reactions
         # -------------------------------------------------------------
+        if re.match(r"^(h[ie]+y*|hello+|greetings|howdy|sup|good\s+(morning|afternoon|evening)|yo+)(?:\s+(there|assistant|shoppy|bot))?$", raw_clean):
+            return {
+                "response": "Hello! I'm your AgentCart shopping assistant. How can I help you today? You can search for products (e.g. 'find laptops under ₹70,000'), check stock, or manage your cart.",
+                "products": [],
+                "tool_activities": [],
+            }
+
+        if raw_clean in ["who are you", "what can you do", "help", "help me", "what is this", "what do you do"]:
+            return {
+                "response": "I'm your AgentCart AI shopping assistant! I can help you discover products, compare features side-by-side, check real-time stock, manage your cart, and place simulated orders. Try asking: 'Find wireless headphones under 5k' or 'What is the return policy?'",
+                "products": [],
+                "tool_activities": [],
+            }
+
+        # Remove leading conversational prefixes only if followed by additional words
+        clean = re.sub(r'^[,\s]*(so|well|hey|hi|hello|ok|okay)[,\s]+', '', raw_clean).strip()
+        clean = re.sub(r'[?.!,;:]+$', '', clean).strip()
+
         if clean in ["my god", "omg", "wow", "nice", "cool", "super", "great", "awesome", "perfect"]:
             return {
                 "response": "I'm glad to assist you! 😊 How can I help next? You can check out your cart, search for products, or track an order.",
@@ -57,12 +72,42 @@ class FastIntentService:
                 "tool_activities": [],
             }
 
-        if clean in ["hello", "hi", "hey", "good morning", "good evening", "howdy"]:
-            return {
-                "response": "Hello! I'm your AgentCart shopping assistant. How can I help you today? You can search for products, check stock, or manage your cart.",
-                "products": [],
-                "tool_activities": [],
-            }
+
+        # -------------------------------------------------------------
+        # 1.5 Product Comparison Intent ("compare google and samsung", "google and samsung", "compare pixel 8a vs galaxy s24")
+        # -------------------------------------------------------------
+        comp_m = re.search(r'\b(?:compare\s+)?([a-zA-Z0-9\s]+?)\s+(?:and|vs|with)\s+([a-zA-Z0-9\s]+)\b', clean)
+        is_comp_q = "compare" in clean or (" vs " in clean) or (comp_m and any(b in clean for b in ["google", "samsung", "apple", "hp", "asus", "lenovo", "acer", "sony", "dell", "oneplus", "boat"]))
+        if is_comp_q and comp_m:
+            term1 = comp_m.group(1).replace("compare", "").strip()
+            term2 = comp_m.group(2).strip()
+            if term1 and term2 and len(term1) >= 2 and len(term2) >= 2:
+                prods1 = await self.product_service.search_products(query=term1, limit=1)
+                prods2 = await self.product_service.search_products(query=term2, limit=1)
+                if prods1 and prods2 and prods1[0].id != prods2[0].id:
+                    p1 = prods1[0]
+                    p2 = prods2[0]
+                    lines = [f"Here is the side-by-side comparison between **{p1.name}** and **{p2.name}**:\n"]
+                    lines.append(f"### {p1.name} ({p1.brand})")
+                    lines.append(f"• **Price:** ₹{p1.price:,.0f} | **Rating:** ⭐ {p1.rating} | **Stock:** {p1.inventory.quantity if p1.inventory else 0} units")
+                    lines.append(f"• **Warranty:** {p1.warranty or '1 Year'}")
+                    if p1.specifications:
+                        for k, v in p1.specifications.items():
+                            lines.append(f"• **{k.capitalize()}:** {v}")
+                    lines.append(f"\n### {p2.name} ({p2.brand})")
+                    lines.append(f"• **Price:** ₹{p2.price:,.0f} | **Rating:** ⭐ {p2.rating} | **Stock:** {p2.inventory.quantity if p2.inventory else 0} units")
+                    lines.append(f"• **Warranty:** {p2.warranty or '1 Year'}")
+                    if p2.specifications:
+                        for k, v in p2.specifications.items():
+                            lines.append(f"• **{k.capitalize()}:** {v}")
+                    lines.append("\nBoth devices are available! Would you like full specifications or to add one to your cart?")
+                    return {
+                        "response": "\n".join(lines),
+                        "products": [self._format_prod(p1), self._format_prod(p2)],
+                        "tool_activities": [
+                            {"tool_name": "compare_products", "status": "completed", "display_text": f"Comparing {p1.name} vs {p2.name}"}
+                        ]
+                    }
 
         if clean in ["thanks", "thank you", "thx", "thank you so much", "appreciate it"]:
             return {
@@ -239,10 +284,12 @@ class FastIntentService:
             if target_product:
                 res = await self.cart_service.add_to_cart(user_id, target_product.id, qty)
                 await self.session.commit()
+                cart_info = await self.cart_service.get_cart(user_id)
+                total_val = cart_info.get('total_amount', target_product.price * qty)
                 return {
                     "response": (
                         f"Added **{qty}× {target_product.name}** ({target_product.brand}) to your cart! "
-                        f"Total cart value is now **₹{res.get('total_amount', 0):,.0f}**.\n\n"
+                        f"Total cart value is now **₹{total_val:,.0f}**.\n\n"
                         f"Would you like to view your cart or proceed to checkout?"
                     ),
                     "products": [self._format_prod(target_product)],
